@@ -1,5 +1,6 @@
 package com.symphony.bdk.examples;
 
+import static com.symphony.bdk.core.activity.command.SlashCommand.slash;
 import static com.symphony.bdk.core.config.BdkConfigLoader.loadFromSymphonyDir;
 
 import com.symphony.bdk.core.SymphonyBdk;
@@ -19,9 +20,11 @@ public class DatafeedExampleMain {
     bdk.datafeed().subscribe(new RealTimeEventListener() {
       @Override
       public void onMessageSent(V4Initiator initiator, V4MessageSent event) {
-        log.info("Message with id {} successfully received !", event.getMessage().getMessageId());
+        bdk.messages().send(event.getMessage().getStream(), "<messageML>Hello, World!</messageML>");
       }
     });
+
+    bdk.activities().register(slash("/hello", context -> bdk.messages().send(context.getStreamId(), "<messageML>Hello, World!</messageML>")));
 
     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
       log.info("Stopping Datafeed...");

@@ -2,7 +2,9 @@ package com.symphony.bdk.core;
 
 import com.symphony.bdk.core.activity.ActivityRegistry;
 import com.symphony.bdk.core.auth.AuthSession;
+import com.symphony.bdk.core.auth.AppAuthSession;
 import com.symphony.bdk.core.auth.AuthenticatorFactory;
+import com.symphony.bdk.core.auth.ExtensionAppAuthenticator;
 import com.symphony.bdk.core.auth.OboAuthenticator;
 import com.symphony.bdk.core.auth.exception.AuthInitializationException;
 import com.symphony.bdk.core.auth.exception.AuthUnauthorizedException;
@@ -14,7 +16,6 @@ import com.symphony.bdk.core.service.datafeed.DatafeedService;
 import com.symphony.bdk.core.service.stream.StreamService;
 import com.symphony.bdk.core.service.user.UserService;
 
-import lombok.Generated;
 import lombok.extern.slf4j.Slf4j;
 import org.apiguardian.api.API;
 
@@ -28,6 +29,7 @@ import java.util.Optional;
 public class SymphonyBdk {
 
   private final OboAuthenticator oboAuthenticator;
+  private final ExtensionAppAuthenticator extensionAppAuthenticator;
 
   private final ActivityRegistry activityRegistry;
   private final SessionService sessionService;
@@ -36,31 +38,18 @@ public class SymphonyBdk {
   private final MessageService messageService;
   private final DatafeedService datafeedService;
 
-  @Generated
   public SymphonyBdk(BdkConfig config) throws AuthInitializationException, AuthUnauthorizedException {
-    ApiClientFactory apiClientFactory = new ApiClientFactory(config);
+    this(config, new ApiClientFactory(config));
+  }
+
+  protected SymphonyBdk(BdkConfig config, ApiClientFactory apiClientFactory)
+      throws AuthInitializationException, AuthUnauthorizedException {
     final AuthenticatorFactory authenticatorFactory = new AuthenticatorFactory(config, apiClientFactory);
     AuthSession botSession = authenticatorFactory.getBotAuthenticator().authenticateBot();
     this.oboAuthenticator = config.isOboConfigured() ? authenticatorFactory.getOboAuthenticator() : null;
+    this.extensionAppAuthenticator = config.isOboConfigured() ? authenticatorFactory.getExtensionAppAuthenticator() : null;
     ServiceFactory serviceFactory =
-        new ServiceFactory(apiClientFactory.getPodClient(), apiClientFactory.getAgentClient(), botSession, config);
-
-    // service init
-    this.sessionService = serviceFactory.getSessionService();
-    this.userService = serviceFactory.getUserService();
-    this.streamService = serviceFactory.getStreamService();
-    this.messageService = serviceFactory.getMessageService();
-    this.datafeedService = serviceFactory.getDatafeedService();
-
-    // setup activities
-    this.activityRegistry = new ActivityRegistry(this.sessionService.getSession(botSession), this.datafeedService::subscribe);
-  }
-
-  protected SymphonyBdk(BdkConfig config, ServiceFactory serviceFactory, AuthenticatorFactory authenticatorFactory)
-      throws AuthInitializationException, AuthUnauthorizedException {
-    AuthSession botSession = authenticatorFactory.getBotAuthenticator().authenticateBot();
-    this.oboAuthenticator = config.isOboConfigured() ? authenticatorFactory.getOboAuthenticator() : null;
-
+        new ServiceFactory(apiClientFactory, botSession, config);
     // service init
     this.sessionService = serviceFactory.getSessionService();
     this.userService = serviceFactory.getUserService();
@@ -137,6 +126,20 @@ public class SymphonyBdk {
    */
   public AuthSession obo(String username) throws AuthUnauthorizedException {
     return this.getOboAuthenticator().authenticateByUsername(username);
+  }
+
+  /**
+   * Extension App Authenticate by app token
+   * @param appToken App Token
+   * @return Extension App authentication session
+   */
+  public AppAuthSession app(String appToken) throws AuthUnauthorizedException {
+    return this.getExtensionAppAuthenticator().authenticateExtensionApp(appToken);
+  }
+
+  protected ExtensionAppAuthenticator getExtensionAppAuthenticator() {
+    return Optional.ofNullable(this.extensionAppAuthenticator)
+        .orElseThrow(() -> new IllegalStateException("Extension app is not configured."));
   }
 
   protected OboAuthenticator getOboAuthenticator() {

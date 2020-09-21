@@ -15,7 +15,7 @@ public class Example {
     
     public static void main(String[] args) {
         // Initialize the BDK entry point
-        final SymphonyBdk bdk = new SymphonyBdk(loadFromClasspath("config.yaml"));
+        final SymphonyBdk bdk = new SymphonyBdk(loadFromClasspath("/config.yaml"));
     }
 }
 ```
@@ -31,7 +31,7 @@ public class Example {
     
     public static void main(String[] args) {
         // Initialize the BDK entry point
-        final SymphonyBdk bdk = new SymphonyBdk(loadFromClasspath("config.yaml"));
+        final SymphonyBdk bdk = new SymphonyBdk(loadFromClasspath("/config.yaml"));
         // Using users service
         final List<V2UserDetail> userDetails = bdk.users().listUsersDetail(new UserFilter());
         // Using datafeed service
@@ -49,3 +49,5 @@ that is available in BDK is:
 - Datafeed Service: `bdk.datafeed()`
 - Activities Registry: `bdk.activities()`
 
+----
+[Home :house:](./index.md)

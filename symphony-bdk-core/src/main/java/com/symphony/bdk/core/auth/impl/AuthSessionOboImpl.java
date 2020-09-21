@@ -1,6 +1,7 @@
 package com.symphony.bdk.core.auth.impl;
 
 import com.symphony.bdk.core.auth.AuthSession;
+import com.symphony.bdk.core.auth.OboAuthenticator;
 import com.symphony.bdk.core.auth.exception.AuthUnauthorizedException;
 
 import org.apiguardian.api.API;
@@ -72,8 +73,10 @@ public class AuthSessionOboImpl implements AuthSession {
     }
   }
 
-
-  protected OboAuthenticatorRsaImpl getAuthenticator() {
+  /**
+   * This method is only visible for testing.
+   */
+  protected OboAuthenticator getAuthenticator() {
     return authenticator;
   }
 }
