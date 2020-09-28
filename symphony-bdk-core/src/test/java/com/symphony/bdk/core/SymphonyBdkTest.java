@@ -23,6 +23,8 @@ import com.symphony.bdk.core.service.user.UserService;
 import com.symphony.bdk.core.test.JsonHelper;
 import com.symphony.bdk.core.test.MockApiClient;
 
+import com.symphony.bdk.http.api.HttpClient;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -96,6 +98,12 @@ public class SymphonyBdkTest {
   }
 
   @Test
+  void getHttpClientBuilderTest() {
+    HttpClient.Builder builder = this.symphonyBdk.http();
+    assertNotNull(builder);
+  }
+
+  @Test
   void oboAuthenticateTest() throws AuthUnauthorizedException {
     this.mockApiClient.onPost(LOGIN_PUBKEY_APP_AUTHENTICATE, "{ \"token\": \"1234\", \"name\": \"sessionToken\" }");
 
@@ -119,10 +127,20 @@ public class SymphonyBdkTest {
         + "  \"expireAt\" : 1539636528288\n"
         + "}");
 
-    AppAuthSession authSession = this.symphonyBdk.app("APP_TOKEN");
+    AppAuthSession authSession = this.symphonyBdk.appAuthenticator().authenticateExtensionApp("APP_TOKEN");
 
     assertEquals(authSession.getSymphonyToken(), "SYMPHONY_TOKEN");
     assertEquals(authSession.getAppToken(), "APP_TOKEN");
     assertEquals(authSession.expireAt(), 1539636528288L);
+  }
+
+  @Test
+  void botSessionTest() {
+    assertNotNull(this.symphonyBdk.botSession());
+  }
+
+  @Test
+  void botInfoTest() {
+    assertNotNull(this.symphonyBdk.botInfo());
   }
 }
