@@ -10,8 +10,10 @@ import com.symphony.bdk.core.auth.exception.AuthUnauthorizedException;
 import com.symphony.bdk.core.client.ApiClientFactory;
 import com.symphony.bdk.core.config.model.BdkConfig;
 import com.symphony.bdk.core.service.SessionService;
+import com.symphony.bdk.core.service.connection.ConnectionService;
 import com.symphony.bdk.core.service.datafeed.DatafeedService;
 import com.symphony.bdk.core.service.message.MessageService;
+import com.symphony.bdk.core.service.presence.PresenceService;
 import com.symphony.bdk.core.service.stream.StreamService;
 import com.symphony.bdk.core.service.user.UserService;
 import com.symphony.bdk.core.util.ServiceLookup;
@@ -44,6 +46,8 @@ public class SymphonyBdk {
   private final UserService userService;
   private final MessageService messageService;
   private final DatafeedService datafeedService;
+  private final PresenceService presenceService;
+  private final ConnectionService connectionService;
 
   public SymphonyBdk(BdkConfig config) throws AuthInitializationException, AuthUnauthorizedException {
     this(config, new ApiClientFactory(config));
@@ -64,6 +68,8 @@ public class SymphonyBdk {
     this.sessionService = serviceFactory.getSessionService();
     this.userService = serviceFactory.getUserService();
     this.streamService = serviceFactory.getStreamService();
+    this.presenceService = serviceFactory.getPresenceService();
+    this.connectionService = serviceFactory.getConnectionService();
     this.messageService = serviceFactory.getMessageService();
     this.datafeedService = serviceFactory.getDatafeedService();
 
@@ -120,6 +126,24 @@ public class SymphonyBdk {
    */
   public StreamService streams() {
     return this.streamService;
+  }
+
+  /**
+   * Get the {@link PresenceService} from a Bdk entry point.
+   *
+   * @return {@link PresenceService} presence service instance.
+   */
+  public PresenceService presences() {
+    return this.presenceService;
+  }
+
+  /**
+   * Get the {@link ConnectionService} from a Bdk entry point.
+   *
+   * @return {@link ConnectionService} connection service instance.
+   */
+  public ConnectionService connections() {
+    return this.connectionService;
   }
 
   /**
