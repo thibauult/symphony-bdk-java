@@ -58,7 +58,14 @@ pod:
   port: 443
 
 agent:
-  context: agent
+  loadBalancing:
+    mode: roundRobin
+    stickiness: false
+    nodes:
+      - host: agent1.symphony.com
+        port: 7443
+        context: app/
+      - host: agent2.symphony.com
 
 keyManager:
   host: dev-key.symphony.com
@@ -106,7 +113,8 @@ user specify the dedicated `host`, `port`, `context`, `scheme` inside the client
 - `pod` contains information like host, port, scheme, context, proxy... of the pod on which 
 the service account using by the bot is created.
 - `agent` contains information like host, port, scheme, context, proxy... of the agent which 
-the bot connects to.
+the bot connects to. It can also contain a `loadBalancing` field: if defined,
+it should not any field among scheme, host, port, context.
 - `keyManager` contains information like host, port, scheme, context, proxy... of the key 
 manager which manages the key token of the bot.
 - `bot` contains information about the bot like the username, the private key or 
@@ -145,6 +153,24 @@ service.
 datafeed service v1 is used.
 - `retry`: the specific retry configuration can be used to override the global retry configuration. If no
 retry configuration is defined, the global one will be used.
+
+#### Agent load-balancing configuration
+The `agent.loadBalancing` part of the configuration contains the information in order to load balance calls to the agent if wanted.
+None of the fields `scheme`, `host`, `port`, `context` should be set if field `loadBalancing` is defined.
+Fields inside `loadBalancing` are:
+- `mode`: mandatory, can be `external`, `roundRobin` or `random`.
+- `stickiness`: optional boolean, default value is true.
+- `nodes`: mandatory and must contain at least one element. List items must have at least `host` field put and can contain the following other fields: `scheme`, `port`, `context`.
+
+`roundRobin` and `random` modes mean calls to the agent are load balanced across all `nodes`, respectively in a round robin and random fashion.
+`external` mode means each time we want to pick a new agent host, we make a call to the endpoint
+[/v1/info](https://developers.symphony.com/restapi/reference#agent-info-v1) on the first node provided in `nodes`.
+The actual agent URL is taken from the field `serverFqdn` in the response body.
+
+When `stickiness` is set to true, it means one picks a given agent and makes all calls to the same agent node.
+Otherwise, when `stickiness` is set to false, one picks a new agent node each time a call is made.
+
+When using datafeed services, calls will always be sticky, regardless of the `stickiness` value.
 
 ## Configuration format
 Both of `JSON` and `YAML` formats are supported by BDK configuration. Using `JSON`, a minimal configuration file would 

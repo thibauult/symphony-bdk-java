@@ -10,18 +10,9 @@ import org.apiguardian.api.API;
 @Getter
 @Setter
 @API(status = API.Status.STABLE)
-public class BdkConfig {
+public class BdkConfig extends BdkServerConfig {
 
-  private static final String DEFAULT_SCHEME = "https";
-  private static final int DEFAULT_HTTPS_PORT = 443;
-
-  // the targeted URLs can be defined globally here and overridden for each agent, pod, keyManager, sessionAuth config
-  private String scheme = DEFAULT_SCHEME;
-  private String host;
-  private Integer port = DEFAULT_HTTPS_PORT;
-  private String context = "";
-
-  private BdkClientConfig agent = new BdkClientConfig(this);
+  private BdkAgentConfig agent = new BdkAgentConfig(this);
   private BdkClientConfig pod = new BdkClientConfig(this);
   private BdkClientConfig keyManager = new BdkClientConfig(this);
   private BdkClientConfig sessionAuth = new BdkClientConfig(this);
@@ -51,7 +42,7 @@ public class BdkConfig {
     return datafeed.getRetry() == null ? retry : datafeed.getRetry();
   }
 
-  public void setAgent(BdkClientConfig agent) {
+  public void setAgent(BdkAgentConfig agent) {
     this.agent = attachParent(agent);
   }
 
@@ -67,7 +58,7 @@ public class BdkConfig {
     this.sessionAuth = attachParent(sessionAuth);
   }
 
-  private BdkClientConfig attachParent(BdkClientConfig config) {
+  private <T extends BdkClientConfig> T attachParent(T config) {
     config.setParentConfig(this);
     return config;
   }

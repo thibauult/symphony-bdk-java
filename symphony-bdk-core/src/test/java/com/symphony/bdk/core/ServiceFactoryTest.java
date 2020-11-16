@@ -5,24 +5,25 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.symphony.bdk.core.service.connection.ConnectionService;
-import com.symphony.bdk.core.service.presence.PresenceService;
-import com.symphony.bdk.core.service.signal.SignalService;
-import com.symphony.bdk.http.api.ApiClient;
 import com.symphony.bdk.core.auth.AuthSession;
 import com.symphony.bdk.core.client.ApiClientFactory;
 import com.symphony.bdk.core.config.BdkConfigLoader;
 import com.symphony.bdk.core.config.exception.BdkConfigException;
 import com.symphony.bdk.core.config.model.BdkConfig;
-
 import com.symphony.bdk.core.config.model.BdkDatafeedConfig;
-import com.symphony.bdk.core.service.message.MessageService;
-import com.symphony.bdk.core.service.SessionService;
+import com.symphony.bdk.core.service.health.HealthService;
+import com.symphony.bdk.core.service.session.SessionService;
+import com.symphony.bdk.core.service.application.ApplicationService;
+import com.symphony.bdk.core.service.connection.ConnectionService;
 import com.symphony.bdk.core.service.datafeed.DatafeedService;
 import com.symphony.bdk.core.service.datafeed.impl.DatafeedServiceV1;
 import com.symphony.bdk.core.service.datafeed.impl.DatafeedServiceV2;
+import com.symphony.bdk.core.service.message.MessageService;
+import com.symphony.bdk.core.service.presence.PresenceService;
+import com.symphony.bdk.core.service.signal.SignalService;
 import com.symphony.bdk.core.service.stream.StreamService;
 import com.symphony.bdk.core.service.user.UserService;
+import com.symphony.bdk.http.api.ApiClient;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -79,6 +80,12 @@ public class ServiceFactoryTest {
   }
 
   @Test
+  void getApplicationManagementServiceTest() {
+    ApplicationService applicationManagementService = this.serviceFactory.getApplicationService();
+    assertNotNull(applicationManagementService);
+  }
+
+  @Test
   void getSessionServiceTest() {
     SessionService sessionService = this.serviceFactory.getSessionService();
     assertNotNull(sessionService);
@@ -88,6 +95,12 @@ public class ServiceFactoryTest {
   void getMessageServiceTest() {
     MessageService messageService = this.serviceFactory.getMessageService();
     assertNotNull(messageService);
+  }
+
+  @Test
+  void getHealthServiceTest() {
+    HealthService healthService = this.serviceFactory.getHealthService();
+    assertNotNull(healthService);
   }
 
   @Test
