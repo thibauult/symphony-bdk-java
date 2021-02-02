@@ -4,12 +4,12 @@ import com.symphony.bdk.core.auth.AppAuthSession;
 import com.symphony.bdk.core.auth.ExtensionAppTokensRepository;
 import com.symphony.bdk.core.auth.exception.AuthInitializationException;
 import com.symphony.bdk.core.auth.exception.AuthUnauthorizedException;
-import com.symphony.bdk.core.auth.impl.model.ExtensionAppAuthenticateRequest;
 import com.symphony.bdk.core.auth.jwt.JwtHelper;
 import com.symphony.bdk.core.auth.jwt.UserClaim;
 import com.symphony.bdk.core.config.model.BdkRetryConfig;
 import com.symphony.bdk.gen.api.CertificateAuthenticationApi;
 import com.symphony.bdk.gen.api.CertificatePodApi;
+import com.symphony.bdk.gen.api.model.ExtensionAppAuthenticateRequest;
 import com.symphony.bdk.gen.api.model.ExtensionAppTokens;
 import com.symphony.bdk.gen.api.model.PodCertificate;
 import com.symphony.bdk.http.api.ApiClient;
@@ -73,5 +73,10 @@ public class ExtensionAppAuthenticatorCertImpl extends AbstractExtensionAppAuthe
   @Override
   public UserClaim validateJwt(String jwt) throws AuthInitializationException {
     return JwtHelper.validateJwt(jwt, this.getPodCertificate().getCertificate());
+  }
+
+  @Override
+  protected String getBasePath(){
+    return certificatePodApi.getApiClient().getBasePath();
   }
 }
