@@ -6,6 +6,7 @@ import com.symphony.bdk.core.service.datafeed.DatafeedVersion;
 import com.symphony.bdk.core.service.datafeed.RealTimeEventListener;
 import com.symphony.bdk.core.service.datafeed.impl.DatafeedLoopV1;
 import com.symphony.bdk.core.service.datafeed.impl.DatafeedLoopV2;
+import com.symphony.bdk.core.service.session.SessionService;
 import com.symphony.bdk.gen.api.DatafeedApi;
 import com.symphony.bdk.spring.SymphonyBdkCoreProperties;
 import com.symphony.bdk.spring.events.RealTimeEvent;
@@ -42,14 +43,15 @@ public class BdkDatafeedConfig {
       SymphonyBdkCoreProperties properties,
       DatafeedApi datafeedApi,
       AuthSession botSession,
-      DatafeedVersion datafeedVersion
+      DatafeedVersion datafeedVersion,
+      SessionService sessionService
   ) {
 
     if (datafeedVersion == DatafeedVersion.V2) {
-      return new DatafeedLoopV2(datafeedApi, botSession, properties);
+      return new DatafeedLoopV2(datafeedApi, botSession, properties, sessionService.getSession());
     }
 
-    return new DatafeedLoopV1(datafeedApi, botSession, properties);
+    return new DatafeedLoopV1(datafeedApi, botSession, properties, sessionService.getSession());
   }
 
   @Bean
@@ -68,6 +70,7 @@ public class BdkDatafeedConfig {
    * Allows to publish application {@link RealTimeEvent} asynchronously from {@link RealTimeEventsDispatcher}.
    */
   @Bean(name = "applicationEventMulticaster")
+  @ConditionalOnProperty(value = "bdk.datafeed.event.async", havingValue = "true", matchIfMissing = true)
   public ApplicationEventMulticaster simpleApplicationEventMulticaster() {
     final SimpleApplicationEventMulticaster eventMulticaster = new SimpleApplicationEventMulticaster();
     eventMulticaster.setTaskExecutor(new SimpleAsyncTaskExecutor());

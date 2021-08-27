@@ -26,6 +26,7 @@ import com.symphony.bdk.core.service.datafeed.RealTimeEventListener;
 import com.symphony.bdk.core.service.datafeed.exception.NestedRetryException;
 import com.symphony.bdk.gen.api.DatafeedApi;
 import com.symphony.bdk.gen.api.model.AckId;
+import com.symphony.bdk.gen.api.model.UserV2;
 import com.symphony.bdk.gen.api.model.V4Event;
 import com.symphony.bdk.gen.api.model.V4Initiator;
 import com.symphony.bdk.gen.api.model.V4MessageSent;
@@ -43,6 +44,7 @@ import org.mockito.ArgumentMatcher;
 import org.mockito.Mockito;
 
 import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -62,6 +64,7 @@ class DatafeedLoopV2Test {
   private ApiClient datafeedApiClient;
   private DatafeedApi datafeedApi;
   private AuthSession authSession;
+  private UserV2 botInfo;
   private RealTimeEventListener listener;
 
   @BeforeEach
@@ -72,6 +75,7 @@ class DatafeedLoopV2Test {
     bdkConfig.setDatafeed(datafeedConfig);
     bdkConfig.setRetry(ofMinimalInterval(2));
 
+    this.botInfo = Mockito.mock(UserV2.class);
     this.authSession = Mockito.mock(AuthSessionRsaImpl.class);
     when(this.authSession.getSessionToken()).thenReturn("1234");
     when(this.authSession.getKeyManagerToken()).thenReturn("1234");
@@ -85,11 +89,12 @@ class DatafeedLoopV2Test {
     this.datafeedService = new DatafeedLoopV2(
         this.datafeedApi,
         this.authSession,
-        bdkConfig
+        bdkConfig,
+        botInfo
     );
     this.listener = new RealTimeEventListener() {
       @Override
-      public boolean isAcceptingEvent(V4Event event, String username) {
+      public boolean isAcceptingEvent(V4Event event, UserV2 botInfo) {
         return true;
       }
 
@@ -142,7 +147,7 @@ class DatafeedLoopV2Test {
     CountDownLatch blockNewListenerIsAdded = new CountDownLatch(1);
     datafeedService.subscribe(new RealTimeEventListener() {
       @Override
-      public boolean isAcceptingEvent(V4Event event, String username) {
+      public boolean isAcceptingEvent(V4Event event, UserV2 botInfo) {
         blockDispatchingToListeners.countDown();
         try {
           blockNewListenerIsAdded.await();
@@ -166,7 +171,7 @@ class DatafeedLoopV2Test {
     Future<Void> addANewListener = executorService.submit(() -> {
       datafeedService.subscribe(new RealTimeEventListener() {
         @Override
-        public boolean isAcceptingEvent(V4Event event, String username) {
+        public boolean isAcceptingEvent(V4Event event, UserV2 botInfo) {
           // once the listener is added it will stop the DF loop
           if (datafeedService.getAckId().getAckId().equals("ack-id2")) {
             datafeedService.stop();
@@ -209,7 +214,7 @@ class DatafeedLoopV2Test {
     AtomicBoolean firstCall = new AtomicBoolean(true);
     this.datafeedService.subscribe(new RealTimeEventListener() {
       @Override
-      public boolean isAcceptingEvent(V4Event event, String username) {
+      public boolean isAcceptingEvent(V4Event event, UserV2 botInfo) {
         return true;
       }
 
@@ -252,7 +257,7 @@ class DatafeedLoopV2Test {
     AtomicBoolean firstCall = new AtomicBoolean(true);
     this.datafeedService.subscribe(new RealTimeEventListener() {
       @Override
-      public boolean isAcceptingEvent(V4Event event, String username) {
+      public boolean isAcceptingEvent(V4Event event, UserV2 botInfo) {
         return true;
       }
 
@@ -294,11 +299,12 @@ class DatafeedLoopV2Test {
     DatafeedLoopV2 customConfigService = new DatafeedLoopV2(
         this.datafeedApi,
         this.authSession,
-        bdkConfig
+        bdkConfig,
+        botInfo
     );
     customConfigService.subscribe(new RealTimeEventListener() {
       @Override
-      public boolean isAcceptingEvent(V4Event event, String username) {
+      public boolean isAcceptingEvent(V4Event event, UserV2 botInfo) {
         return true;
       }
 
@@ -354,7 +360,7 @@ class DatafeedLoopV2Test {
     this.datafeedService.unsubscribe(this.listener);
     this.datafeedService.subscribe(new RealTimeEventListener() {
       @Override
-      public boolean isAcceptingEvent(V4Event event, String username) {
+      public boolean isAcceptingEvent(V4Event event, UserV2 botInfo) {
         return true;
       }
 
@@ -487,6 +493,24 @@ class DatafeedLoopV2Test {
         Collections.singletonList(new V5Datafeed().id("test-id")));
     when(datafeedApi.readDatafeed("test-id", "1234", "1234", ackId)).thenThrow(
         new ProcessingException(new SocketTimeoutException()));
+
+    ApiClient client = mock(ApiClient.class);
+    when(datafeedApi.getApiClient()).thenReturn(client);
+    when(client.getBasePath()).thenReturn("path/to/the/agent");
+
+    this.datafeedService.start();
+    verify(datafeedApi, times(1)).listDatafeed("1234", "1234", "tibot");
+    verify(datafeedApi, times(2)).readDatafeed("test-id", "1234", "1234", ackId);
+    verify(datafeedApiClient, times(2)).rotate();
+  }
+
+  @Test
+  void testStartUnknownHostReadDatafeed() throws ApiException, AuthUnauthorizedException {
+    AckId ackId = datafeedService.getAckId();
+    when(datafeedApi.listDatafeed("1234", "1234", "tibot")).thenReturn(
+        Collections.singletonList(new V5Datafeed().id("test-id")));
+    when(datafeedApi.readDatafeed("test-id", "1234", "1234", ackId)).thenThrow(
+        new ProcessingException(new UnknownHostException()));
 
     ApiClient client = mock(ApiClient.class);
     when(datafeedApi.getApiClient()).thenReturn(client);
