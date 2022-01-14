@@ -1,18 +1,23 @@
 package com.symphony.bdk.spring;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import com.symphony.bdk.core.activity.ActivityRegistry;
 import com.symphony.bdk.core.auth.ExtensionAppAuthenticator;
 import com.symphony.bdk.core.auth.OboAuthenticator;
 import com.symphony.bdk.core.auth.exception.AuthInitializationException;
 import com.symphony.bdk.core.client.loadbalancing.DatafeedLoadBalancedApiClient;
+import com.symphony.bdk.core.extension.ExtensionService;
 import com.symphony.bdk.core.service.datafeed.DatafeedLoop;
 import com.symphony.bdk.gen.api.SystemApi;
+import com.symphony.bdk.http.api.ApiClient;
 import com.symphony.bdk.spring.annotation.SlashAnnotationProcessor;
 import com.symphony.bdk.spring.config.BdkActivityConfig;
 import com.symphony.bdk.spring.config.BdkOboServiceConfig;
 import com.symphony.bdk.spring.config.BdkServiceConfig;
+import com.symphony.bdk.spring.extension.TestExtension;
+import com.symphony.bdk.spring.extension.TestExtensionService;
 import com.symphony.bdk.spring.service.DatafeedAsyncLauncherService;
 
 import org.junit.jupiter.api.Test;
@@ -41,6 +46,7 @@ class SymphonyBdkAutoConfigurationTest {
             "bdk.bot.username=tibot",
             "bdk.bot.privateKey.path=classpath:/privatekey.pem"
         )
+        .withBean(TestExtension.class)
         .withUserConfiguration(SymphonyBdkMockedConfiguration.class)
         .withConfiguration(AutoConfigurations.of(SymphonyBdkAutoConfiguration.class));
 
@@ -56,6 +62,12 @@ class SymphonyBdkAutoConfigurationTest {
 
       //verify that bean for OBO authentication has not been injected
       assertThat(context).doesNotHaveBean("oboAuthenticator");
+
+      // verify extension service
+      assertThat(context).hasSingleBean(ExtensionService.class);
+      assertThat(context).hasSingleBean(TestExtension.class);
+      assertThat(context).hasSingleBean(TestExtensionService.class);
+      assertThat(context.getBean(ExtensionService.class).service(TestExtension.class)).isEqualTo(context.getBean(TestExtensionService.class));
     });
   }
 
@@ -103,6 +115,107 @@ class SymphonyBdkAutoConfigurationTest {
       assertThat(context).doesNotHaveBean("oboConnectionService");
       assertThat(context).doesNotHaveBean("oboSignalService");
       assertThat(context).doesNotHaveBean("oboMessageService");
+    });
+  }
+
+  @Test
+  void shouldInitializeCustomAuthenticatorsIfTheyExist() {
+    final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+        .withPropertyValues(
+            "bdk.scheme=http",
+            "bdk.host=localhost",
+            "bdk.context=context",
+
+            "bdk.bot.username=testbot",
+            "bdk.bot.privateKey.path=classpath:/privatekey.pem",
+
+            "bdk.app.appId=testapp",
+            "bdk.app.privateKey.path=classpath:/privatekey.pem"
+        )
+        .withBean("existingMockedOboAuthenticator", OboAuthenticator.class, ()-> mock(OboAuthenticator.class))
+        .withBean("existingMockedExtensionAppAuthenticator", ExtensionAppAuthenticator.class, ()-> mock(ExtensionAppAuthenticator.class))
+        .withUserConfiguration(SymphonyBdkMockedConfiguration.class)
+        .withConfiguration(AutoConfigurations.of(SymphonyBdkAutoConfiguration.class));
+
+    contextRunner.run(context -> {
+      assertThat(context).hasBean("existingMockedOboAuthenticator");
+      assertThat(context).hasBean("existingMockedExtensionAppAuthenticator");
+      assertThat(context).hasSingleBean(OboAuthenticator.class);
+      assertThat(context).hasSingleBean(ExtensionAppAuthenticator.class);
+    });
+  }
+
+  @Test
+  void shouldAddAuthenticationIfCommonJwtEnabled() {
+    final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+        .withPropertyValues(
+            "bdk.pod.scheme=http",
+            "bdk.pod.host=localhost",
+
+            "bdk.agent.scheme=http",
+            "bdk.agent.host=localhost",
+
+            "bdk.keyManager.scheme=http",
+            "bdk.keyManager.host=localhost",
+
+            "bdk.bot.username=testBot",
+            "bdk.bot.privateKey.path=classpath:/privatekey.pem",
+
+            "bdk.commonJwt.enabled=true"
+        )
+        .withUserConfiguration(SymphonyBdkMockedConfiguration.class)
+        .withConfiguration(AutoConfigurations.of(SymphonyBdkAutoConfiguration.class));
+
+    contextRunner.run(context -> {
+      assertThat(context).hasBean("podApiClient");
+      ApiClient podClient = (ApiClient) context.getBean("podApiClient");
+      assertThat(podClient.getAuthentications()).isNotEmpty();
+      assertThat(podClient.getAuthentications()).containsKey("bearerAuth");
+    });
+  }
+
+  @Test
+  void shouldFailOnOboWithCommonJwtEnabled() {
+    final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+        .withPropertyValues(
+            "bdk.host=localhost",
+
+            "bdk.bot.username=testBot",
+            "bdk.bot.privateKey.path=classpath:/privatekey.pem",
+
+            "bdk.app.appId=my-app",
+            "bdk.app.privateKey.path=classpath:/privatekey.pem",
+
+            "bdk.commonJwt.enabled=true"
+        )
+        .withUserConfiguration(SymphonyBdkMockedConfiguration.class)
+        .withConfiguration(AutoConfigurations.of(SymphonyBdkAutoConfiguration.class));
+
+
+    contextRunner.run(context -> {
+      assertThat(context).hasFailed();
+      assertThat(context).getFailure().hasRootCauseInstanceOf(UnsupportedOperationException.class);
+    });
+  }
+
+  @Test
+  void shouldFailOnOboOnlyWithCommonJwtEnabled() {
+    final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+        .withPropertyValues(
+            "bdk.host=localhost",
+
+            "bdk.app.appId=my-app",
+            "bdk.app.privateKey.path=classpath:/privatekey.pem",
+
+            "bdk.commonJwt.enabled=true"
+        )
+        .withUserConfiguration(SymphonyBdkMockedConfiguration.class)
+        .withConfiguration(AutoConfigurations.of(SymphonyBdkAutoConfiguration.class));
+
+
+    contextRunner.run(context -> {
+      assertThat(context).hasFailed();
+      assertThat(context).getFailure().hasRootCauseInstanceOf(UnsupportedOperationException.class);
     });
   }
 

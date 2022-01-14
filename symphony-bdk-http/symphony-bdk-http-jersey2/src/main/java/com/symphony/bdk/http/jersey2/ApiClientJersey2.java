@@ -5,6 +5,7 @@ import com.symphony.bdk.http.api.ApiClientBodyPart;
 import com.symphony.bdk.http.api.ApiException;
 import com.symphony.bdk.http.api.ApiResponse;
 import com.symphony.bdk.http.api.Pair;
+import com.symphony.bdk.http.api.auth.Authentication;
 import com.symphony.bdk.http.api.tracing.DistributedTracingContext;
 import com.symphony.bdk.http.api.util.TypeReference;
 
@@ -27,6 +28,7 @@ import java.net.URLEncoder;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -34,6 +36,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import javax.ws.rs.HttpMethod;
 import javax.ws.rs.ProcessingException;
@@ -57,6 +60,8 @@ public class ApiClientJersey2 implements ApiClient {
   protected String basePath;
   protected Map<String, String> defaultHeaderMap;
   protected String tempFolderPath;
+  protected Map<String, Authentication> authentications;
+  protected List<String> enforcedAuthenticationSchemes;
 
   public ApiClientJersey2(final Client httpClient, String basePath, Map<String, String> defaultHeaders,
       String temporaryFolderPath) {
@@ -64,6 +69,8 @@ public class ApiClientJersey2 implements ApiClient {
     this.basePath = basePath;
     this.defaultHeaderMap = new HashMap<>(defaultHeaders);
     this.tempFolderPath = temporaryFolderPath;
+    this.authentications = new HashMap<>();
+    this.enforcedAuthenticationSchemes = new ArrayList<>();
   }
 
   /**
@@ -87,6 +94,8 @@ public class ApiClientJersey2 implements ApiClient {
     // Not using `.target(this.basePath).path(path)` below,
     // to support (constant) query string in `path`, e.g. "/posts?draft=1"
     WebTarget target = httpClient.target(this.basePath + path);
+
+    this.updateParamsForAuth(authNames, headerParams);
 
     if (queryParams != null) {
       for (Pair queryParam : queryParams) {
@@ -360,6 +369,22 @@ public class ApiClientJersey2 implements ApiClient {
   }
 
   /**
+   * {@inheritDoc}
+   */
+  @Override
+  public Map<String, Authentication> getAuthentications() {
+    return this.authentications;
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public void addEnforcedAuthenticationScheme(String name) {
+    this.enforcedAuthenticationSchemes.add(name);
+  }
+
+  /**
    * Check if the given MIME is a JSON MIME.
    * JSON MIME examples:
    * application/json
@@ -532,5 +557,36 @@ public class ApiClientJersey2 implements ApiClient {
       responseHeaders.put(entry.getKey(), headers);
     }
     return responseHeaders;
+  }
+
+  /**
+   * Update query and header parameters based on authentication settings.
+   *
+   * @param authNames The authentications to apply
+   */
+  protected void updateParamsForAuth(String[] authNames, Map<String, String> headerParams) throws ApiException {
+
+    if (authNames == null && this.enforcedAuthenticationSchemes.isEmpty()) {
+      return;
+    }
+
+    authNames = withEnforcedSecurityScheme(authNames);
+
+    for (String authName : authNames) {
+      Authentication auth = this.authentications.get(authName);
+      if (auth == null) {
+        throw new RuntimeException("Authentication undefined: " + authName);
+      }
+      auth.apply(headerParams);
+    }
+  }
+
+  private String[] withEnforcedSecurityScheme(String[] authNames) {
+
+    if (authNames == null) {
+      authNames = new String[0];
+    }
+
+    return Stream.concat(this.enforcedAuthenticationSchemes.stream(), Arrays.stream(authNames)).toArray(String[]::new);
   }
 }
