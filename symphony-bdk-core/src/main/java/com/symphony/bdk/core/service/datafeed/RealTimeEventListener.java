@@ -7,7 +7,7 @@ import org.apiguardian.api.API;
 /**
  * Interface definition for a callback to be invoked when a real-time event is received from the datafeed.
  *
- * @see <a href="https://developers.symphony.com/restapi/docs/real-time-events">real-time-events</a>
+ * @see <a href="https://docs.developers.symphony.com/building-bots-on-symphony/datafeed/real-time-events">Real-Time Events</a>
  */
 @API(status = API.Status.STABLE)
 public interface RealTimeEventListener {
@@ -206,6 +206,17 @@ public interface RealTimeEventListener {
    *                        and re-queue the events in datafeed. Other exceptions will be caught silently.
    */
   default void onSymphonyElementsAction(V4Initiator initiator, V4SymphonyElementsAction event) throws EventException {
+  }
+
+  /**
+   * Called when a GENERICSYSTEMEVENT event is received.
+   *
+   * @param initiator Event initiator.
+   * @param event     Generic system event payload.
+   * @throws EventException Throw this exception if this method should fail the current events processing
+   *                        and re-queue the events in datafeed. Other exceptions will be caught silently.
+   */
+  default void onGenericSystemEvent(V4Initiator initiator, V4GenericSystemEvent event) throws EventException {
   }
 
 }

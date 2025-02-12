@@ -1,19 +1,5 @@
 package com.symphony.bdk.core.service.datafeed.impl;
 
-import static com.symphony.bdk.core.test.BdkRetryConfigTestHelper.ofMinimalInterval;
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 import com.symphony.bdk.core.auth.AuthSession;
 import com.symphony.bdk.core.auth.exception.AuthUnauthorizedException;
 import com.symphony.bdk.core.auth.impl.AuthSessionImpl;
@@ -32,6 +18,7 @@ import com.symphony.bdk.gen.api.model.UserV2;
 import com.symphony.bdk.gen.api.model.V4ConnectionAccepted;
 import com.symphony.bdk.gen.api.model.V4ConnectionRequested;
 import com.symphony.bdk.gen.api.model.V4Event;
+import com.symphony.bdk.gen.api.model.V4GenericSystemEvent;
 import com.symphony.bdk.gen.api.model.V4Initiator;
 import com.symphony.bdk.gen.api.model.V4InstantMessageCreated;
 import com.symphony.bdk.gen.api.model.V4MessageSent;
@@ -51,9 +38,8 @@ import com.symphony.bdk.gen.api.model.V4UserLeftRoom;
 import com.symphony.bdk.gen.api.model.V4UserRequestedToJoinRoom;
 import com.symphony.bdk.http.api.ApiClient;
 import com.symphony.bdk.http.api.ApiException;
-
 import com.symphony.bdk.http.api.tracing.DistributedTracingContext;
-
+import jakarta.ws.rs.ProcessingException;
 import org.apache.commons.io.FileUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -75,7 +61,20 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import javax.ws.rs.ProcessingException;
+import static com.symphony.bdk.core.test.BdkRetryConfigTestHelper.ofMinimalInterval;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class DatafeedLoopV1Test {
 
@@ -112,8 +111,7 @@ class DatafeedLoopV1Test {
   private void initializeBdkConfig() throws BdkConfigException {
     this.bdkConfig = BdkConfigLoader.loadFromClasspath("/config/config.yaml");
 
-    BdkDatafeedConfig datafeedConfig = this.bdkConfig.getDatafeed();
-    this.bdkConfig.setDatafeed(datafeedConfig);
+    this.bdkConfig.getDatafeed().setRetry(ofMinimalInterval(2));
     this.bdkConfig.setRetry(ofMinimalInterval(2));
   }
 
@@ -152,7 +150,8 @@ class DatafeedLoopV1Test {
   }
 
   private List<V4Event> getMessageSentEvent() {
-    final V4Event event = new V4Event().type(RealTimeEventType.MESSAGESENT.name()).payload(new V4Payload())
+    final V4Event event = new V4Event().type(RealTimeEventType.MESSAGESENT.name())
+        .payload(new V4Payload().messageSent(new V4MessageSent()))
         .initiator(new V4Initiator().user(new V4User().username("username").userId(123456789L)));
     return Collections.singletonList(event);
   }
@@ -160,13 +159,13 @@ class DatafeedLoopV1Test {
   @Test
   void startTest() throws ApiException, AuthUnauthorizedException {
     when(datafeedApi.v4DatafeedCreatePost("1234", "1234")).thenReturn(new Datafeed().id("test-id"));
-    when(datafeedApi.v4DatafeedIdReadGet("test-id", "1234", "1234", null))
+    when(datafeedApi.v4DatafeedIdReadGet("test-id", null,"1234",  "1234"))
         .thenReturn(getMessageSentEvent());
 
     this.datafeedService.start();
 
     verify(datafeedApi, times(1)).v4DatafeedCreatePost("1234", "1234");
-    verify(datafeedApi, times(1)).v4DatafeedIdReadGet("test-id", "1234", "1234", null);
+    verify(datafeedApi, times(1)).v4DatafeedIdReadGet("test-id", null,"1234",  "1234");
 
     assertTrue(datafeedIdRepository.read().isPresent());
     assertEquals("test-id", datafeedIdRepository.read().get());
@@ -179,13 +178,13 @@ class DatafeedLoopV1Test {
     datafeedIdRepository.write("persisted-id");
     initializeDatafeedService(); // datafeedId is read from repository in constructor
 
-    when(datafeedApi.v4DatafeedIdReadGet("persisted-id", "1234", "1234", null))
+    when(datafeedApi.v4DatafeedIdReadGet("persisted-id", null,"1234",  "1234"))
         .thenReturn(getMessageSentEvent());
 
     this.datafeedService.start();
 
     verify(datafeedApi, times(0)).v4DatafeedCreatePost("1234", "1234");
-    verify(datafeedApi, times(1)).v4DatafeedIdReadGet("persisted-id", "1234", "1234", null);
+    verify(datafeedApi, times(1)).v4DatafeedIdReadGet("persisted-id", null,"1234",  "1234");
   }
 
   @Test
@@ -200,13 +199,13 @@ class DatafeedLoopV1Test {
     initializeDatafeedService();
 
     when(datafeedApi.v4DatafeedCreatePost("1234", "1234")).thenReturn(new Datafeed().id("test-id"));
-    when(datafeedApi.v4DatafeedIdReadGet("test-id", "1234", "1234", null))
+    when(datafeedApi.v4DatafeedIdReadGet("test-id", null,"1234",  "1234"))
         .thenReturn(getMessageSentEvent());
 
     this.datafeedService.start();
 
     verify(datafeedApi, times(1)).v4DatafeedCreatePost("1234", "1234");
-    verify(datafeedApi, times(1)).v4DatafeedIdReadGet("test-id", "1234", "1234", null);
+    verify(datafeedApi, times(1)).v4DatafeedIdReadGet("test-id", null,"1234",  "1234");
 
     assertTrue(datafeedIdRepository.read().isPresent());
     assertEquals("test-id", datafeedIdRepository.read().get());
@@ -227,13 +226,13 @@ class DatafeedLoopV1Test {
     initializeDatafeedApi();
     initializeDatafeedService();
 
-    when(datafeedApi.v4DatafeedIdReadGet("persisted-id", "1234", "1234", null))
+    when(datafeedApi.v4DatafeedIdReadGet("persisted-id", null,"1234",  "1234"))
         .thenReturn(getMessageSentEvent());
 
     this.datafeedService.start();
 
     verify(datafeedApi, times(0)).v4DatafeedCreatePost("1234", "1234");
-    verify(datafeedApi, times(1)).v4DatafeedIdReadGet("persisted-id", "1234", "1234", null);
+    verify(datafeedApi, times(1)).v4DatafeedIdReadGet("persisted-id", null,"1234",  "1234");
     verify(loadBalancedApiClient, times(1)).setBasePath("persisted-agent-path");
   }
 
@@ -242,17 +241,17 @@ class DatafeedLoopV1Test {
     datafeedIdRepository.write("persisted-id");
     initializeDatafeedService(); // datafeedId is read from repository in constructor
 
-    when(datafeedApi.v4DatafeedIdReadGet("persisted-id", "1234", "1234", null))
+    when(datafeedApi.v4DatafeedIdReadGet("persisted-id", null,"1234",  "1234"))
         .thenThrow(new ApiException(400, "expired DF id"));
     when(datafeedApi.v4DatafeedCreatePost("1234", "1234")).thenReturn(new Datafeed().id("test-id"));
-    when(datafeedApi.v4DatafeedIdReadGet("test-id", "1234", "1234", null))
+    when(datafeedApi.v4DatafeedIdReadGet("test-id", null,"1234",  "1234"))
         .thenReturn(getMessageSentEvent());
 
     this.datafeedService.start();
 
-    verify(datafeedApi, times(1)).v4DatafeedIdReadGet("persisted-id", "1234", "1234", null);
+    verify(datafeedApi, times(1)).v4DatafeedIdReadGet("persisted-id", null,"1234",  "1234");
     verify(datafeedApi, times(1)).v4DatafeedCreatePost("1234", "1234");
-    verify(datafeedApi, times(1)).v4DatafeedIdReadGet("test-id", "1234", "1234", null);
+    verify(datafeedApi, times(1)).v4DatafeedIdReadGet("test-id", null,"1234",  "1234");
     verify(datafeedApiClient, times(1)).rotate();
 
     assertTrue(datafeedIdRepository.read().isPresent());
@@ -266,14 +265,14 @@ class DatafeedLoopV1Test {
     datafeedIdRepository.write("persisted-id");
     initializeDatafeedService(); // datafeedId is read from repository in constructor
 
-    when(datafeedApi.v4DatafeedIdReadGet("persisted-id", "1234", "1234", null))
+    when(datafeedApi.v4DatafeedIdReadGet("persisted-id", null,"1234",  "1234"))
         .thenThrow(new ApiException(400, "expired DF id"));
     when(datafeedApi.v4DatafeedCreatePost("1234", "1234"))
         .thenThrow(new ApiException(404, "unhandled exception"));
 
     assertThrows(NestedRetryException.class, () -> this.datafeedService.start());
 
-    verify(datafeedApi, times(1)).v4DatafeedIdReadGet("persisted-id", "1234", "1234", null);
+    verify(datafeedApi, times(1)).v4DatafeedIdReadGet("persisted-id", null,"1234",  "1234");
     verify(datafeedApi, times(1)).v4DatafeedCreatePost("1234", "1234");
     verify(datafeedApiClient, times(2)).rotate();
   }
@@ -291,13 +290,13 @@ class DatafeedLoopV1Test {
   @Test
   void startTestWithRetryClientRead() throws ApiException, AuthUnauthorizedException {
     when(datafeedApi.v4DatafeedCreatePost("1234", "1234")).thenReturn(new Datafeed().id("test-id"));
-    when(datafeedApi.v4DatafeedIdReadGet("test-id", "1234", "1234", null))
+    when(datafeedApi.v4DatafeedIdReadGet("test-id", null,"1234",  "1234"))
         .thenThrow(new ApiException(400, "test_client_error"));
     doNothing().when(authSession).refresh();
 
     assertThrows(ApiException.class, this.datafeedService::start);
     verify(datafeedApi, times(3)).v4DatafeedCreatePost("1234", "1234");
-    verify(datafeedApi, times(2)).v4DatafeedIdReadGet("test-id", "1234", "1234", null);
+    verify(datafeedApi, times(2)).v4DatafeedIdReadGet("test-id", null,"1234",  "1234");
     verify(datafeedApiClient, times(2)).rotate();
   }
 
@@ -323,35 +322,35 @@ class DatafeedLoopV1Test {
   @Test
   void startTestFailedAuthRead() throws ApiException, AuthUnauthorizedException {
     when(datafeedApi.v4DatafeedCreatePost("1234", "1234")).thenReturn(new Datafeed().id("test-id"));
-    when(datafeedApi.v4DatafeedIdReadGet("test-id", "1234", "1234", null))
+    when(datafeedApi.v4DatafeedIdReadGet("test-id", null,"1234",  "1234"))
         .thenThrow(new ApiException(401, "test_client_error"));
     doThrow(AuthUnauthorizedException.class).when(authSession).refresh();
 
     assertThrows(AuthUnauthorizedException.class, this.datafeedService::start);
     verify(datafeedApi, times(1)).v4DatafeedCreatePost("1234", "1234");
-    verify(datafeedApi, times(1)).v4DatafeedIdReadGet("test-id", "1234", "1234", null);
+    verify(datafeedApi, times(1)).v4DatafeedIdReadGet("test-id", null,"1234",  "1234");
     verify(datafeedApiClient, times(1)).rotate();
   }
 
   @Test
   void startTestFailedSocketTimeoutRead() throws ApiException, AuthUnauthorizedException {
     when(datafeedApi.v4DatafeedCreatePost("1234", "1234")).thenReturn(new Datafeed().id("test-id"));
-    when(datafeedApi.v4DatafeedIdReadGet("test-id", "1234", "1234", null))
+    when(datafeedApi.v4DatafeedIdReadGet("test-id", null,"1234",  "1234"))
         .thenThrow(new ProcessingException(new SocketTimeoutException()));
 
     this.datafeedService.start();
-    verify(datafeedApi, times(2)).v4DatafeedIdReadGet("test-id", "1234", "1234", null);
+    verify(datafeedApi, times(2)).v4DatafeedIdReadGet("test-id", null,"1234", "1234");
     verify(datafeedApiClient, times(2)).rotate();
   }
 
   @Test
   void startTestFailedUnknownHost() throws ApiException, AuthUnauthorizedException {
     when(datafeedApi.v4DatafeedCreatePost("1234", "1234")).thenReturn(new Datafeed().id("test-id"));
-    when(datafeedApi.v4DatafeedIdReadGet("test-id", "1234", "1234", null))
+    when(datafeedApi.v4DatafeedIdReadGet("test-id", null,"1234",  "1234"))
         .thenThrow(new ProcessingException(new UnknownHostException()));
 
     this.datafeedService.start();
-    verify(datafeedApi, times(2)).v4DatafeedIdReadGet("test-id", "1234", "1234", null);
+    verify(datafeedApi, times(2)).v4DatafeedIdReadGet("test-id", null,"1234",  "1234");
     verify(datafeedApiClient, times(2)).rotate();
   }
 
@@ -359,7 +358,7 @@ class DatafeedLoopV1Test {
   void startServiceAlreadyStarted() throws ApiException, AuthUnauthorizedException {
     AtomicInteger signal = new AtomicInteger(0);
     when(datafeedApi.v4DatafeedCreatePost("1234", "1234")).thenReturn(new Datafeed().id("test-id"));
-    when(datafeedApi.v4DatafeedIdReadGet("test-id", "1234", "1234", null))
+    when(datafeedApi.v4DatafeedIdReadGet("test-id", null, "1234", "1234"))
         .thenReturn(getMessageSentEvent());
 
     this.datafeedService.unsubscribe(this.listener);
@@ -471,7 +470,8 @@ class DatafeedLoopV1Test {
         .roomMemberPromotedToOwner(new V4RoomMemberPromotedToOwner())
         .userLeftRoom(new V4UserLeftRoom())
         .userJoinedRoom(new V4UserJoinedRoom())
-        .userRequestedToJoinRoom(new V4UserRequestedToJoinRoom());
+        .userRequestedToJoinRoom(new V4UserRequestedToJoinRoom())
+        .genericSystemEvent(new V4GenericSystemEvent());
 
     final V4Initiator initiator = new V4Initiator().user(new V4User().username("username").userId(123456789L));
     for (RealTimeEventType type : types) {
@@ -482,8 +482,8 @@ class DatafeedLoopV1Test {
     events.add(new V4Event().type("unknown-type").payload(payload));
     events.add(new V4Event().type(null));
     events.add(new V4Event().type(types[0].name()).initiator(
-        new V4Initiator().user(
-            new V4User().username(this.bdkConfig.getBot().getUsername()).userId(123456789L))
+            new V4Initiator().user(
+                new V4User().username(this.bdkConfig.getBot().getUsername()).userId(123456789L))
         )
     );
 
@@ -502,21 +502,22 @@ class DatafeedLoopV1Test {
     this.datafeedService.subscribe(spiedListener);
     this.datafeedService.handleV4EventList(events);
 
-    verify(spiedListener).onMessageSent(initiator, payload.getMessageSent());
-    verify(spiedListener).onMessageSuppressed(initiator, payload.getMessageSuppressed());
-    verify(spiedListener).onSymphonyElementsAction(initiator, payload.getSymphonyElementsAction());
-    verify(spiedListener).onSharedPost(initiator, payload.getSharedPost());
-    verify(spiedListener).onInstantMessageCreated(initiator, payload.getInstantMessageCreated());
-    verify(spiedListener).onRoomCreated(initiator, payload.getRoomCreated());
-    verify(spiedListener).onRoomUpdated(initiator, payload.getRoomUpdated());
-    verify(spiedListener).onRoomDeactivated(initiator, payload.getRoomDeactivated());
-    verify(spiedListener).onRoomReactivated(initiator, payload.getRoomReactivated());
-    verify(spiedListener).onConnectionRequested(initiator, payload.getConnectionRequested());
-    verify(spiedListener).onConnectionAccepted(initiator, payload.getConnectionAccepted());
-    verify(spiedListener).onRoomMemberDemotedFromOwner(initiator, payload.getRoomMemberDemotedFromOwner());
-    verify(spiedListener).onRoomMemberPromotedToOwner(initiator, payload.getRoomMemberPromotedToOwner());
-    verify(spiedListener).onUserLeftRoom(initiator, payload.getUserLeftRoom());
-    verify(spiedListener).onUserJoinedRoom(initiator, payload.getUserJoinedRoom());
-    verify(spiedListener).onUserRequestedToJoinRoom(initiator, payload.getUserRequestedToJoinRoom());
+    verify(spiedListener).onMessageSent(eq(initiator), any(V4MessageSent.class));
+    verify(spiedListener).onMessageSuppressed(eq(initiator), any(V4MessageSuppressed.class));
+    verify(spiedListener).onSymphonyElementsAction(eq(initiator), any(V4SymphonyElementsAction.class));
+    verify(spiedListener).onSharedPost(eq(initiator), any(V4SharedPost.class));
+    verify(spiedListener).onInstantMessageCreated(eq(initiator), any(V4InstantMessageCreated.class));
+    verify(spiedListener).onRoomCreated(eq(initiator), any(V4RoomCreated.class));
+    verify(spiedListener).onRoomUpdated(eq(initiator), any(V4RoomUpdated.class));
+    verify(spiedListener).onRoomDeactivated(eq(initiator), any(V4RoomDeactivated.class));
+    verify(spiedListener).onRoomReactivated(eq(initiator), any(V4RoomReactivated.class));
+    verify(spiedListener).onConnectionRequested(eq(initiator), any(V4ConnectionRequested.class));
+    verify(spiedListener).onConnectionAccepted(eq(initiator), any(V4ConnectionAccepted.class));
+    verify(spiedListener).onRoomMemberDemotedFromOwner(eq(initiator), any(V4RoomMemberDemotedFromOwner.class));
+    verify(spiedListener).onRoomMemberPromotedToOwner(eq(initiator), any(V4RoomMemberPromotedToOwner.class));
+    verify(spiedListener).onUserLeftRoom(eq(initiator), any(V4UserLeftRoom.class));
+    verify(spiedListener).onUserJoinedRoom(eq(initiator), any(V4UserJoinedRoom.class));
+    verify(spiedListener).onUserRequestedToJoinRoom(eq(initiator), any(V4UserRequestedToJoinRoom.class));
+    verify(spiedListener).onGenericSystemEvent(eq(initiator), any(V4GenericSystemEvent.class));
   }
 }

@@ -2,6 +2,8 @@ package com.symphony.bdk.spring;
 
 import com.symphony.bdk.core.config.model.BdkConfig;
 
+import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -11,4 +13,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 @ConfigurationProperties(prefix = "bdk")
 public class SymphonyBdkCoreProperties extends BdkConfig {
+
+  @Value("#{'${bdk.datafeed.enabled:true}' == 'true' and '${bdk.datahose.enabled:false}' == 'true'}")
+  private boolean areBothDatafeedAndDatahoseEnabled;
+
+  @PostConstruct
+  public void validate() {
+    if (areBothDatafeedAndDatahoseEnabled) {
+      throw new RuntimeException("Both datafeed and datahose are enabled. Please disable datafeed if you want to use datahose.");
+    }
+  }
 }

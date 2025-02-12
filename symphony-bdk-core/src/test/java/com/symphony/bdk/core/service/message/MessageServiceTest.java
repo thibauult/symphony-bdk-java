@@ -155,7 +155,7 @@ class MessageServiceTest {
     final V4Stream v4Stream = new V4Stream().streamId(STREAM_ID);
     Instant now = Instant.now();
     assertNotNull(service.listMessages(v4Stream, now));
-    verify(service).listMessages(eq(STREAM_ID), eq(now));
+    verify(service).listMessages(STREAM_ID, now);
   }
 
   @Test
@@ -167,7 +167,7 @@ class MessageServiceTest {
     Instant now = Instant.now();
     PaginationAttribute pagination = new PaginationAttribute(2, 2);
     assertNotNull(service.listMessages(v4Stream, now, pagination));
-    verify(service).listMessages(eq(STREAM_ID), eq(now), eq(pagination));
+    verify(service).listMessages(STREAM_ID, now, pagination);
   }
 
   @Test
@@ -198,15 +198,17 @@ class MessageServiceTest {
 
   @Test
   void testSearchMessagesQueryValidation() {
+    final MessageSearchQuery query = new MessageSearchQuery().streamType("FOO");
     assertThrows(
         IllegalArgumentException.class,
-        () -> messageService.searchMessages(new MessageSearchQuery().streamType("FOO")),
+        () -> messageService.searchMessages(query),
         "checks if streamType value is a valid one"
     );
 
+    final MessageSearchQuery query2 = new MessageSearchQuery().text("foo");
     assertThrows(
         IllegalArgumentException.class,
-        () -> messageService.searchMessages(new MessageSearchQuery().text("foo")),
+        () -> messageService.searchMessages(query2),
         "text require streamId arg to be provided"
     );
   }
@@ -230,7 +232,7 @@ class MessageServiceTest {
     final V4Stream v4Stream = new V4Stream().streamId(STREAM_ID);
 
     assertNotNull(service.send(v4Stream, MESSAGE));
-    verify(service).send(eq(STREAM_ID), eq(MESSAGE));
+    verify(service).send(STREAM_ID, MESSAGE);
   }
 
   @Test
@@ -345,6 +347,19 @@ class MessageServiceTest {
   }
 
   @Test
+  void testMessageSilentUpdate() throws IOException {
+    mockApiClient.onPost(V4_STREAM_MESSAGE_UPDATE.replace("{sid}", STREAM_ID).replace("{mid}", MESSAGE_ID),
+        JsonHelper.readFromClasspath("/message/update_message.json"));
+
+    final V4Message messageToUpdate = new V4Message().stream(new V4Stream().streamId(STREAM_ID)).messageId(MESSAGE_ID);
+    final Message content = Message.builder().content("This is a message update with silent flag as false").silent(false).build();
+    final V4Message updateMessage = this.messageService.update(messageToUpdate, content);
+
+    assertEquals(MESSAGE_ID, updateMessage.getMessageId());
+    assertEquals(false, updateMessage.getSilent());
+  }
+
+  @Test
   void testGetAttachment() throws ApiException {
     final String attachmentId = "attachmentId";
 
@@ -406,6 +421,14 @@ class MessageServiceTest {
   }
 
   @Test
+  void testGetAttachmentTypesInOboMode() throws IOException {
+    mockApiClient.onGet(V1_ALLOWED_TYPES,
+        JsonHelper.readFromClasspath("/message/get_attachment_types.json"));
+
+    assertEquals(Arrays.asList(".csv", ".gif"), messageService.obo(this.authSession).getAttachmentTypes());
+  }
+
+  @Test
   void testGetMessage() throws IOException {
     mockApiClient.onGet(V1_MESSAGE_GET.replace("{id}", MESSAGE_ID),
         JsonHelper.readFromClasspath("/message/get_message.json"));
@@ -442,7 +465,7 @@ class MessageServiceTest {
         .v1StreamsSidAttachmentsGet(any(), any(), any(), any(), any(), any());
 
     assertNotNull(messageService.listAttachments(STREAM_ID, null, null, null, AttachmentSort.ASC));
-    verify(streamsApi).v1StreamsSidAttachmentsGet(eq(STREAM_ID), any(), any(), any(), any(), eq("ASC"));
+    verify(streamsApi).v1StreamsSidAttachmentsGet(eq(STREAM_ID), any(), any(), any(), eq("ASC"), any());
   }
 
   @Test
@@ -451,7 +474,7 @@ class MessageServiceTest {
         .v1StreamsSidAttachmentsGet(any(), any(), any(), any(), any(), any());
 
     assertNotNull(messageService.listAttachments(STREAM_ID, null, null, null, AttachmentSort.DESC));
-    verify(streamsApi).v1StreamsSidAttachmentsGet(eq(STREAM_ID), any(), any(), any(), any(), eq("DESC"));
+    verify(streamsApi).v1StreamsSidAttachmentsGet(eq(STREAM_ID), any(), any(), any(), eq("DESC"), any());
   }
 
   @Test
@@ -460,7 +483,7 @@ class MessageServiceTest {
         .v1StreamsSidAttachmentsGet(any(), any(), any(), any(), any(), any());
 
     assertNotNull(messageService.listAttachments(STREAM_ID, null, null, null, null));
-    verify(streamsApi).v1StreamsSidAttachmentsGet(eq(STREAM_ID), any(), any(), any(), any(), eq("ASC"));
+    verify(streamsApi).v1StreamsSidAttachmentsGet(eq(STREAM_ID), any(), any(), any(), eq("ASC"), any());
   }
 
   @Test

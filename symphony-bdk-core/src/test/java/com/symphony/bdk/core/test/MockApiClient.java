@@ -1,5 +1,26 @@
 package com.symphony.bdk.core.test;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.symphony.bdk.http.api.ApiClient;
+import com.symphony.bdk.http.api.Pair;
+import com.symphony.bdk.http.jersey2.ApiClientJersey2;
+import jakarta.ws.rs.client.Client;
+import jakarta.ws.rs.client.Entity;
+import jakarta.ws.rs.client.Invocation;
+import jakarta.ws.rs.client.WebTarget;
+import jakarta.ws.rs.core.GenericType;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import org.mockito.ArgumentMatchers;
+
+import java.io.UnsupportedEncodingException;
+import java.lang.reflect.ParameterizedType;
+import java.net.URLEncoder;
+import java.util.HashMap;
+import java.util.List;
+
 import static org.mockito.AdditionalAnswers.answer;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -9,29 +30,6 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
-
-import com.symphony.bdk.http.api.ApiClient;
-import com.symphony.bdk.http.api.Pair;
-import com.symphony.bdk.http.jersey2.ApiClientJersey2;
-
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.json.JsonMapper;
-import org.mockito.ArgumentMatchers;
-
-import java.io.UnsupportedEncodingException;
-import java.lang.reflect.ParameterizedType;
-import java.net.URLEncoder;
-import java.util.HashMap;
-import java.util.List;
-
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.Entity;
-import javax.ws.rs.client.Invocation;
-import javax.ws.rs.client.WebTarget;
-import javax.ws.rs.core.GenericType;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 
 public class MockApiClient {
 
@@ -64,6 +62,14 @@ public class MockApiClient {
     this.onRequestWithResponseCode("POST", statusCode, path, null, resContent);
   }
 
+  public void onPatch(String path, String resContent) {
+    this.onRequestWithResponseCode("PATCH", 200, path, null, resContent);
+  }
+
+  public void onPatch(int statusCode, String path, String resContent) {
+    this.onRequestWithResponseCode("PATCH", statusCode, path, null, resContent);
+  }
+
   public void onPut(String path, String resContent) {
     this.onRequestWithResponseCode("PUT", 200, path, null, resContent);
   }
@@ -88,7 +94,7 @@ public class MockApiClient {
       String resContent)  {
     WebTarget webTarget = null;
     try {
-       webTarget = this.httpClient.target(path);
+      webTarget = this.httpClient.target(path);
     } catch (RuntimeException ignored) {
       // ignored
     }
@@ -122,6 +128,8 @@ public class MockApiClient {
       doReturn(response).when(invocationBuilder).put(any(Entity.class));
     } else if ("DELETE".equals(method)) {
       doReturn(response).when(invocationBuilder).method(eq("DELETE"), any(Entity.class));
+    } else if ("PATCH".equals(method)) {
+      doReturn(response).when(invocationBuilder).method(eq("PATCH"), any(Entity.class));
     }
   }
 

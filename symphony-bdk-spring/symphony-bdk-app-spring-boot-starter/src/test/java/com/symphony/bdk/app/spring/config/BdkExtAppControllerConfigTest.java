@@ -1,12 +1,12 @@
 package com.symphony.bdk.app.spring.config;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.Mockito.mock;
-
 import com.symphony.bdk.app.spring.SymphonyBdkAppProperties;
 import com.symphony.bdk.app.spring.auth.service.CircleOfTrustService;
 
 import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.mock;
 
 public class BdkExtAppControllerConfigTest {
 

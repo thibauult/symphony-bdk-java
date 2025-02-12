@@ -126,7 +126,7 @@ public class SlashAnnotationProcessor implements SmartInitializingSingleton, Bea
         this.registerSlashMethod(beanName, m, annotation);
       } else {
         log.warn("Method '{}' is annotated by @Slash but does not respect the expected prototype. "
-            + "It must accept a first argument of type '{}' and (potential) other arguments based on the slash command pattern.",
+                + "It must accept a first argument of type '{}' and (potential) other arguments based on the slash command pattern.",
             m, CommandContext.class);
       }
     }
@@ -152,13 +152,15 @@ public class SlashAnnotationProcessor implements SmartInitializingSingleton, Bea
     final Object bean = this.beanFactory.getBean(beanName);
 
     final SlashCommand slashCommand = SlashCommand.slash(annotation.value(), annotation.mentionBot(),
-        createSlashCommandCallback(bean, method, buildParameterIndexes(method)), annotation.description());
+        annotation.asynchronous(), createSlashCommandCallback(bean, method, buildParameterIndexes(method)),
+        annotation.description());
 
     getActivityRegistry().register(slashCommand);
   }
 
   // visible for testing
-  protected static Consumer<CommandContext> createSlashCommandCallback(Object bean, Method method, Map<String, Integer> methodParameterIndexes) {
+  protected static Consumer<CommandContext> createSlashCommandCallback(Object bean, Method method,
+      Map<String, Integer> methodParameterIndexes) {
     return c -> {
       try {
         final Object[] slashMethodParameters = buildSlashMethodParameters(methodParameterIndexes, c);
@@ -191,15 +193,18 @@ public class SlashAnnotationProcessor implements SmartInitializingSingleton, Bea
     }
   }
 
-  private static boolean hasMatchingParameterNamesAndTypes(Method m, Map<String, ? extends Class<?>> slashArgumentDefinitions) {
+  private static boolean hasMatchingParameterNamesAndTypes(Method m,
+      Map<String, ? extends Class<?>> slashArgumentDefinitions) {
     final String[] parameterNames = PARAMETER_NAME_DISCOVERER.getParameterNames(m);
     if (parameterNames == null) {
       log.warn("Unable to retrieve method parameter names, cannot register slash method");
       return false;
     }
 
-    for (int i = 1; i < m.getParameters().length; i++) { // we skip first parameter as it should be of CommandContext type (checked before)
-      if (!areNameAndTypeInSlashArguments(parameterNames[i], m.getParameters()[i].getType(), slashArgumentDefinitions)) {
+    for (int i = 1; i < m.getParameters().length;
+        i++) { // we skip first parameter as it should be of CommandContext type (checked before)
+      if (!areNameAndTypeInSlashArguments(parameterNames[i], m.getParameters()[i].getType(),
+          slashArgumentDefinitions)) {
         return false;
       }
     }
@@ -210,11 +215,13 @@ public class SlashAnnotationProcessor implements SmartInitializingSingleton, Bea
     return m.getParameters()[0].getType().equals(CommandContext.class);
   }
 
-  private static boolean hasCorrectNumberOfParameters(Method m, Map<String, ? extends Class<?>> slashArgumentDefinitions) {
+  private static boolean hasCorrectNumberOfParameters(Method m,
+      Map<String, ? extends Class<?>> slashArgumentDefinitions) {
     return m.getParameterCount() == 1 + slashArgumentDefinitions.size();
   }
 
-  private static boolean areNameAndTypeInSlashArguments(String parameterName, Class<?> parameterType, Map<String, ? extends Class<?>> slashArgumentDefinitions) {
+  private static boolean areNameAndTypeInSlashArguments(String parameterName, Class<?> parameterType,
+      Map<String, ? extends Class<?>> slashArgumentDefinitions) {
     final Class<?> slashArgumentType = slashArgumentDefinitions.get(parameterName);
     return slashArgumentType != null && slashArgumentType.equals(parameterType);
   }

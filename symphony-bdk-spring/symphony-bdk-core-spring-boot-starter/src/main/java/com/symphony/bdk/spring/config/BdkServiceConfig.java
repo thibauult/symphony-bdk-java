@@ -5,6 +5,7 @@ import com.symphony.bdk.core.config.model.BdkConfig;
 import com.symphony.bdk.core.retry.RetryWithRecoveryBuilder;
 import com.symphony.bdk.core.service.application.ApplicationService;
 import com.symphony.bdk.core.service.connection.ConnectionService;
+import com.symphony.bdk.core.service.datafeed.DatafeedLoop;
 import com.symphony.bdk.core.service.disclaimer.DisclaimerService;
 import com.symphony.bdk.core.service.health.HealthService;
 import com.symphony.bdk.core.service.message.MessageService;
@@ -33,11 +34,13 @@ import com.symphony.bdk.gen.api.StreamsApi;
 import com.symphony.bdk.gen.api.SystemApi;
 import com.symphony.bdk.gen.api.UserApi;
 import com.symphony.bdk.gen.api.UsersApi;
+import com.symphony.bdk.spring.service.BotInfoService;
 import com.symphony.bdk.template.api.TemplateEngine;
 
 import org.apiguardian.api.API;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 
 /**
@@ -101,9 +104,11 @@ public class BdkServiceConfig {
   }
 
   @Bean
+  @ConditionalOnProperty(value = "bdk.datafeed.enabled", havingValue = "true", matchIfMissing = true)
   @ConditionalOnMissingBean
-  public HealthService healthService(SystemApi systemApi, SignalsApi signalsApi, AuthSession botSession) {
-    return new HealthService(systemApi, signalsApi, botSession);
+  public HealthService healthService(SystemApi systemApi, SignalsApi signalsApi, AuthSession botSession,
+      DatafeedLoop datafeedLoop) {
+    return new HealthService(systemApi, signalsApi, botSession, datafeedLoop);
   }
 
   @Bean
@@ -122,5 +127,11 @@ public class BdkServiceConfig {
   ) {
     return new MessageService(messagesApi, messageApi, messageSuppressionApi, streamsApi, podApi, attachmentsApi,
         defaultApi, botSession, templateEngine, new RetryWithRecoveryBuilder<>().retryConfig(config.getRetry()));
+  }
+
+  @Bean
+  @ConditionalOnMissingBean
+  public BotInfoService botInfoService(SessionService sessionService) {
+    return new BotInfoService(sessionService);
   }
 }

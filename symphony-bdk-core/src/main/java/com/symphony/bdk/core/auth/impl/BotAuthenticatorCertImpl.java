@@ -4,6 +4,7 @@ import com.symphony.bdk.core.auth.AuthSession;
 import com.symphony.bdk.core.auth.exception.AuthUnauthorizedException;
 import com.symphony.bdk.core.config.model.BdkCommonJwtConfig;
 import com.symphony.bdk.core.config.model.BdkRetryConfig;
+import com.symphony.bdk.core.service.version.AgentVersionService;
 import com.symphony.bdk.gen.api.CertificateAuthenticationApi;
 import com.symphony.bdk.gen.api.model.Token;
 import com.symphony.bdk.http.api.ApiClient;
@@ -17,7 +18,7 @@ import javax.annotation.Nonnull;
 /**
  * Bot authenticator certificate implementation.
  *
- * @see <a href="https://developers.symphony.com/symphony-developer/docs/bot-authentication-workflow-1">BotAuthentication Workflow</a>
+ * @see <a href="https://docs.developers.symphony.com/building-bots-on-symphony/authentication/certificate-authentication">Certificate Bot Authentication Workflow</a>
  */
 @Slf4j
 @API(status = API.Status.INTERNAL)
@@ -33,8 +34,9 @@ public class BotAuthenticatorCertImpl extends AbstractBotAuthenticator {
       @Nonnull BdkCommonJwtConfig commonJwtConfig,
       @Nonnull ApiClient loginClient,
       @Nonnull ApiClient sessionAuthClient,
-      @Nonnull ApiClient keyAuthClient) {
-    super(retryConfig, commonJwtConfig, loginClient);
+      @Nonnull ApiClient keyAuthClient,
+      @Nonnull AgentVersionService agentVersionService) {
+    super(retryConfig, commonJwtConfig, loginClient, agentVersionService);
     this.sessionAuthClient = sessionAuthClient;
     this.keyAuthClient = keyAuthClient;
     this.username = username;

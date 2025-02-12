@@ -15,6 +15,7 @@ import com.symphony.bdk.core.retry.RetryWithRecoveryBuilder;
 import com.symphony.bdk.core.service.application.ApplicationService;
 import com.symphony.bdk.core.service.connection.ConnectionService;
 import com.symphony.bdk.core.service.datafeed.DatafeedLoop;
+import com.symphony.bdk.core.service.datafeed.DatahoseLoop;
 import com.symphony.bdk.core.service.disclaimer.DisclaimerService;
 import com.symphony.bdk.core.service.health.HealthService;
 import com.symphony.bdk.core.service.message.MessageService;
@@ -51,6 +52,7 @@ public class SymphonyBdk {
   private final AuthSession botSession;
   private final UserV2 botInfo;
   private final DatafeedLoop datafeedLoop;
+  private final DatahoseLoop datahoseLoop;
   private final ActivityRegistry activityRegistry;
   private final StreamService streamService;
   private final UserService userService;
@@ -125,7 +127,6 @@ public class SymphonyBdk {
     this.connectionService = serviceFactory != null ? serviceFactory.getConnectionService() : null;
     this.signalService = serviceFactory != null ? serviceFactory.getSignalService() : null;
     this.applicationService = serviceFactory != null ? serviceFactory.getApplicationService() : null;
-    this.healthService = serviceFactory != null ? serviceFactory.getHealthService() : null;
     this.messageService = serviceFactory != null ? serviceFactory.getMessageService() : null;
     this.disclaimerService = serviceFactory != null ? serviceFactory.getDisclaimerService() : null;
 
@@ -133,6 +134,11 @@ public class SymphonyBdk {
     this.botInfo = sessionService != null ? sessionService.getSession() : null;
 
     this.datafeedLoop = serviceFactory != null ? serviceFactory.getDatafeedLoop(this.botInfo) : null;
+    this.datahoseLoop = serviceFactory != null ? serviceFactory.getDatahoseLoop(this.botInfo) : null;
+    this.healthService = serviceFactory != null ? serviceFactory.getHealthService() : null;
+    if (healthService != null) {
+      this.healthService.setDatafeedLoop(this.datafeedLoop);
+    }
 
     // setup activities
     this.activityRegistry = this.datafeedLoop != null ? new ActivityRegistry(this.botInfo, this.datafeedLoop) : null;
@@ -174,6 +180,10 @@ public class SymphonyBdk {
    */
   public DatafeedLoop datafeed() {
     return getOrThrowNoBotConfig(this.datafeedLoop);
+  }
+
+  public DatahoseLoop datahose() {
+    return getOrThrowNoBotConfig(this.datahoseLoop);
   }
 
   /**

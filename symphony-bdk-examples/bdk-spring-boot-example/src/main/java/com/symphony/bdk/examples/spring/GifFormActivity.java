@@ -30,7 +30,7 @@ public class GifFormActivity extends FormReplyActivity<FormReplyContext> {
   @Autowired
   private MessageService messageService;
 
-  @Slash("/gif")
+  @Slash(value = "/gif")
   public void displayGifForm(CommandContext context) {
     Template template = this.messageService.templates().newTemplateFromClasspath("/templates/gif.ftl");
     Message message = Message.builder().template(template).build();
@@ -46,7 +46,13 @@ public class GifFormActivity extends FormReplyActivity<FormReplyContext> {
 
   @Override
   public void onActivity(FormReplyContext context) {
-    log.info("Gif category is \"{}\"", context.getFormValue("category"));
+    this.messageService.send(context.getStreamId(),
+        String.format("Gif category is \"%s\"", context.getFormValue("category")));
+  }
+
+  @Override
+  public boolean isAsynchronous() {
+    return true;
   }
 
   @Override

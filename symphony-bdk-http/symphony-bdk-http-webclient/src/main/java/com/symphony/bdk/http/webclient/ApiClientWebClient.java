@@ -8,7 +8,6 @@ import com.symphony.bdk.http.api.Pair;
 import com.symphony.bdk.http.api.auth.Authentication;
 import com.symphony.bdk.http.api.tracing.DistributedTracingContext;
 import com.symphony.bdk.http.api.util.TypeReference;
-
 import io.netty.channel.ConnectTimeoutException;
 import org.apiguardian.api.API;
 import org.springframework.core.ParameterizedTypeReference;
@@ -37,6 +36,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static com.symphony.bdk.http.api.util.ApiUtils.isCollectionOfApiClientBodyPart;
+import static com.symphony.bdk.http.api.util.ApiUtils.isCollectionOfFiles;
 
 /**
  * Spring WebClient implementation for the {@link ApiClient} interface called by generated code.
@@ -76,11 +78,13 @@ public class ApiClientWebClient implements ApiClient {
       final TypeReference<T> returnType
   ) throws ApiException {
 
-    HttpMethod httpMethod = HttpMethod.resolve(method);
-    if (httpMethod == null) {
+    final List<String> allowedMethods =
+            Arrays.asList("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE");
+    if (method == null || !allowedMethods.contains(method)) {
       throw new ApiException(500, "unknown method type " + method);
     }
 
+    HttpMethod httpMethod = HttpMethod.valueOf(method);
     this.updateParamsForAuth(authNames, headerParams);
 
     WebClient.RequestBodySpec requestBodySpec =
@@ -212,11 +216,7 @@ public class ApiClientWebClient implements ApiClient {
         if (s != null) {
           message = s;
         }
-        throw Exceptions.propagate(new ApiException(
-            response.rawStatusCode(),
-            message,
-            headers,
-            s));
+        throw Exceptions.propagate(new ApiException(response.statusCode().value(), message, headers, s));
       });
     }
   }
@@ -233,17 +233,27 @@ public class ApiClientWebClient implements ApiClient {
   private void serializeMultiPartDataEntry(String paramKey, Object paramValue,
       MultiValueMap<String, Object> formValueMap) {
     if (paramValue instanceof File) {
-      File file = (File) paramValue;
-      formValueMap.add(paramKey, new FileSystemResource(file));
+      addFileToFormParam(paramKey, (File) paramValue, formValueMap);
+    } else if (isCollectionOfFiles(paramValue)) {
+      ((Collection<?>) paramValue).forEach(f -> addFileToFormParam(paramKey, (File) f, formValueMap));
     } else if (paramValue instanceof ApiClientBodyPart[]) {
       for (ApiClientBodyPart bodyPart : (ApiClientBodyPart[]) paramValue) {
         serializeApiClientBodyPart(paramKey, bodyPart, formValueMap);
       }
     } else if (paramValue instanceof ApiClientBodyPart) {
       serializeApiClientBodyPart(paramKey, (ApiClientBodyPart) paramValue, formValueMap);
+    } else if (isCollectionOfApiClientBodyPart(paramValue)) {
+      for (Object o : (Collection<?>) paramValue) {
+          serializeApiClientBodyPart(paramKey, (ApiClientBodyPart) o, formValueMap);
+      }
     } else {
-      formValueMap.add(paramKey, parameterToString(paramValue));
+        formValueMap.add(paramKey, parameterToString(paramValue));
     }
+  }
+
+  private void addFileToFormParam(String paramKey, File paramValue, MultiValueMap<String, Object> formValueMap) {
+    File file = paramValue;
+    formValueMap.add(paramKey, new FileSystemResource(file));
   }
 
   private void serializeApiClientBodyPart(String paramKey, ApiClientBodyPart bodyPart,

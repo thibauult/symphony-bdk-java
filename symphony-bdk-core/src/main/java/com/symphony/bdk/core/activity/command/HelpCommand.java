@@ -27,7 +27,7 @@ public class HelpCommand extends SlashCommand {
   private final MessageService messageService;
 
   public HelpCommand(@Nonnull ActivityRegistry activityRegistry, @Nonnull MessageService messageService) {
-    super(HELP_COMMAND, true, c -> {}, DEFAULT_DESCRIPTION);
+    super(HELP_COMMAND, true, false, c -> {}, DEFAULT_DESCRIPTION);
     this.activityRegistry = activityRegistry;
     this.messageService = messageService;
   }
@@ -37,7 +37,7 @@ public class HelpCommand extends SlashCommand {
    */
   @Override
   public void onActivity(CommandContext context) {
-    List<String> infos = this.activityRegistry.getActivityList()
+    List<String> activities = this.activityRegistry.getActivityList()
         .stream()
         .map(AbstractActivity::getInfo)
         .filter(info -> info.type().equals(ActivityType.COMMAND))
@@ -46,8 +46,8 @@ public class HelpCommand extends SlashCommand {
           return info.description().isEmpty() ? String.format(str, "") : String.format(str, " - " + info.description());
         })
         .collect(Collectors.toList());
-    if (!infos.isEmpty()) {
-      String message = "<ul>" + String.join("\n", infos) + "</ul>";
+    if (!activities.isEmpty()) {
+      String message = "<ul>" + String.join("\n", activities) + "</ul>";
       this.messageService.send(context.getStreamId(), Message.builder().content(message).build());
     }
   }
@@ -65,7 +65,7 @@ public class HelpCommand extends SlashCommand {
 
   @Override
   public boolean equals(Object o) {
-    if (this == o) { return true; }
+    if (this == o) {return true;}
 
     if (o instanceof SlashCommand) {
       SlashCommand that = ((SlashCommand) o);

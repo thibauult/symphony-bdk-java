@@ -40,6 +40,7 @@ import com.symphony.bdk.gen.api.model.UserStatus;
 import com.symphony.bdk.gen.api.model.UserSuspension;
 import com.symphony.bdk.gen.api.model.UserV2;
 import com.symphony.bdk.gen.api.model.V1AuditTrailInitiatorList;
+import com.symphony.bdk.gen.api.model.V1AuditTrailInitiatorResponse;
 import com.symphony.bdk.gen.api.model.V2UserAttributes;
 import com.symphony.bdk.gen.api.model.V2UserCreate;
 import com.symphony.bdk.gen.api.model.V2UserDetail;
@@ -814,10 +815,28 @@ class UserServiceTest {
         + "    ],\n"
         + "    \"pagination\": {\n"
         + "        \"cursors\": {\n"
-        + "            \"before\": \"1\",\n"
-        + "            \"after\": \"4\"\n"
+        + "            \"before\": \"1\"\n"
         + "        }\n"
         + "    }\n"
+        + "}");
+
+    List<Long> followers = this.service.listAllUserFollowers(1234L).collect(Collectors.toList());
+
+    assertEquals(followers.size(), 3);
+    assertEquals(followers.get(0), 13056700579848L);
+    assertEquals(followers.get(1), 13056700580889L);
+    assertEquals(followers.get(2), 13056700580890L);
+  }
+
+  @Test
+  void listAllUserFollowersNoPaginationTest() {
+    this.mockApiClient.onGet(V1_LIST_FOLLOWERS.replace("{uid}", "1234"), "{\n"
+        + "    \"count\": 3,\n"
+        + "    \"followers\": [\n"
+        + "        13056700579848,\n"
+        + "        13056700580889,\n"
+        + "        13056700580890\n"
+        + "    ]\n"
         + "}");
 
     List<Long> followers = this.service.listAllUserFollowers(1234L).collect(Collectors.toList());
@@ -839,8 +858,7 @@ class UserServiceTest {
         + "    ],\n"
         + "    \"pagination\": {\n"
         + "        \"cursors\": {\n"
-        + "            \"before\": \"1\",\n"
-        + "            \"after\": \"4\"\n"
+        + "            \"before\": \"1\"\n"
         + "        }\n"
         + "    }\n"
         + "}");
@@ -946,6 +964,24 @@ class UserServiceTest {
   }
 
   @Test
+  void listAllUserFollowingsPaginationNoPaginationTest() {
+    this.mockApiClient.onGet(V1_LIST_FOLLOWING.replace("{uid}", "1234"),
+        "{\n"
+            + "    \"count\": 2,\n"
+            + "    \"following\": [\n"
+            + "        13056700580888,\n"
+            + "        13056700580889\n"
+            + "    ]\n"
+            + "}");
+
+    List<Long> followers = this.service.listAllUserFollowing(1234L, new StreamPaginationAttribute(10, 10)).collect(Collectors.toList());
+
+    assertEquals(followers.size(), 2);
+    assertEquals(followers.get(0), 13056700580888L);
+    assertEquals(followers.get(1), 13056700580889L);
+  }
+
+  @Test
   void userDetailMapperNullTest() {
     V2UserDetail userDetailNull = UserDetailMapper.INSTANCE.userDetailToV2UserDetail(null);
 
@@ -1019,6 +1055,30 @@ class UserServiceTest {
   }
 
   @Test
+  void listAllAuditTrailNoPagination() throws IOException {
+    String response = JsonHelper.readFromClasspath("/audit_trail/audit_trail_initiator_list_v1.json");
+    this.mockApiClient.onGet(V1_AUDIT_TRAIL_PRIVILEGED_USER, response);
+
+    final List<V1AuditTrailInitiatorResponse> auditTrails =
+        this.service.listAllAuditTrail(1551888601279L, 1551888601279L, 1353716993L, "SUPER_ADMINISTRATOR", 2, 3)
+            .collect(Collectors.toList());
+
+    assertEquals(auditTrails.size(), 2);
+  }
+
+  @Test
+  void listAllAuditTrail() throws IOException {
+    String response = JsonHelper.readFromClasspath("/audit_trail/audit_trail_initiator_list_v1_pagination.json");
+    this.mockApiClient.onGet(V1_AUDIT_TRAIL_PRIVILEGED_USER, response);
+
+    final List<V1AuditTrailInitiatorResponse> auditTrails =
+        this.service.listAllAuditTrail(1551888601279L, 1551888601279L, 1353716993L, "SUPER_ADMINISTRATOR", 2, 3)
+            .collect(Collectors.toList());
+
+    assertEquals(auditTrails.size(), 2);
+  }
+
+  @Test
   void listAuditTrailOnlyRequiredParams() throws IOException {
     String response = JsonHelper.readFromClasspath("/audit_trail/audit_trail_initiator_list_v1.json");
     this.mockApiClient.onGet(V1_AUDIT_TRAIL_PRIVILEGED_USER, response);
@@ -1047,9 +1107,10 @@ class UserServiceTest {
     UserSuspension userSuspension = new UserSuspension();
     userSuspension.setSuspended(true);
     userSuspension.setSuspensionReason("reason why");
-    userSuspension.setSuspendedUntil(Instant.now().toEpochMilli());
+    Instant now = Instant.now();
+    userSuspension.setSuspendedUntil(now.toEpochMilli());
 
-    this.service.suspendUser(1234L, "reason why", Instant.now());
+    this.service.suspendUser(1234L, "reason why", now);
 
     verify(spiedUserApi).v1AdminUserUserIdSuspensionUpdatePut(
         eq("1234"),

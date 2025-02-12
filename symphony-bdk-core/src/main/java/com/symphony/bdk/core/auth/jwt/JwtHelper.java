@@ -48,6 +48,8 @@ public class JwtHelper {
   // Expiration of the jwt, 5 minutes maximum, use a little less than that in case of different clock skews
   public static final Long JWT_EXPIRATION_MILLIS = 240_000L;
 
+  private static final String SKD_CLAIM = "canUseSimplifiedKeyDelivery";
+
   // PKCS#8 format
   private static final String PEM_PRIVATE_START = "-----BEGIN PRIVATE KEY-----";
   private static final String PEM_PRIVATE_END = "-----END PRIVATE KEY-----";
@@ -117,12 +119,25 @@ public class JwtHelper {
     final Certificate x509Certificate = parseX509Certificate(certificate);
 
     try {
-      final Claims body = Jwts.parser().setSigningKey(x509Certificate.getPublicKey()).parseClaimsJws(jwt).getBody();
-
+      final Claims body = Jwts.parser().setSigningKey(x509Certificate.getPublicKey())
+        .parseClaimsJws(jwt).getBody();
       return mapper.convertValue(body.get("user"), UserClaim.class);
     } catch (JwtException e) {
       throw new AuthInitializationException("Unable to validate JWT", e);
     }
+  }
+
+  public static boolean isSkdEnabled(String jwt) {
+    try {
+      String claimsObj = extractDecodedClaims(dropBearer(jwt));
+      ObjectNode claims = mapper.readValue(claimsObj, ObjectNode.class);
+      if (claims.has(SKD_CLAIM) && claims.get(SKD_CLAIM).isBoolean()) {
+        return claims.get(SKD_CLAIM).asBoolean();
+      }
+    } catch (Exception e) {
+      return false;
+    }
+    return false;
   }
 
   /**

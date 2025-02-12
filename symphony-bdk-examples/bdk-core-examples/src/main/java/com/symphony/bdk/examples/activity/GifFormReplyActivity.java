@@ -25,6 +25,11 @@ public class GifFormReplyActivity extends FormReplyActivity<GifFormReplyContext>
   }
 
   @Override
+  public boolean isAsynchronous() {
+    return true;
+  }
+
+  @Override
   protected ActivityInfo info() {
     return new ActivityInfo()
         .type(ActivityType.FORM)

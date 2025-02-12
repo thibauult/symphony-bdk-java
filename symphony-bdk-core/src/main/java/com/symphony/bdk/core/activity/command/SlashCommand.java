@@ -10,7 +10,6 @@ import com.symphony.bdk.gen.api.model.V4Initiator;
 import com.symphony.bdk.gen.api.model.V4MessageSent;
 
 import lombok.Getter;
-import org.apache.commons.lang3.StringUtils;
 import org.apiguardian.api.API;
 
 import java.util.Objects;
@@ -28,6 +27,7 @@ public class SlashCommand extends CommandActivity<CommandContext> {
   private final String slashCommandName;
   private final SlashCommandPattern commandPattern;
   private final boolean requiresBotMention;
+  private final boolean isAsync;
   private final Consumer<CommandContext> callback;
   private final String description;
 
@@ -51,7 +51,7 @@ public class SlashCommand extends CommandActivity<CommandContext> {
    */
   public static SlashCommand slash(@Nonnull String slashCommandPattern, boolean requiresBotMention,
       @Nonnull Consumer<CommandContext> callback) {
-    return new SlashCommand(slashCommandPattern, requiresBotMention, callback, "");
+    return new SlashCommand(slashCommandPattern, requiresBotMention, false, callback, "");
   }
 
   /**
@@ -64,7 +64,7 @@ public class SlashCommand extends CommandActivity<CommandContext> {
    */
   public static SlashCommand slash(@Nonnull String slashCommandPattern, @Nonnull Consumer<CommandContext> callback,
       String description) {
-    return slash(slashCommandPattern, true, callback, description);
+    return slash(slashCommandPattern, true, false, callback, description);
   }
 
   /**
@@ -78,22 +78,33 @@ public class SlashCommand extends CommandActivity<CommandContext> {
    */
   public static SlashCommand slash(@Nonnull String slashCommandPattern, boolean requiresBotMention,
       @Nonnull Consumer<CommandContext> callback, String description) {
-    return new SlashCommand(slashCommandPattern, requiresBotMention, callback, description);
+    return new SlashCommand(slashCommandPattern, requiresBotMention, false, callback, description);
+  }
+
+  /**
+   * Returns a new {@link SlashCommand} instance.
+   *
+   * @param slashCommandPattern Pattern of the command (ex: '/gif' or 'gif {option} {{@literal @}mention}').
+   * @param requiresBotMention  Indicates whether the bot has to be mentioned in order to trigger the command.
+   * @param isAsync             Indicated whether the command is asynchronous or not.
+   * @param callback            Callback to be processed when command is detected.
+   * @param description         The summary of the command.
+   * @return a {@link SlashCommand} instance.
+   */
+  public static SlashCommand slash(@Nonnull String slashCommandPattern, boolean requiresBotMention, boolean isAsync,
+      @Nonnull Consumer<CommandContext> callback, String description) {
+    return new SlashCommand(slashCommandPattern, requiresBotMention, isAsync, callback, description);
   }
 
   /**
    * Default protected constructor, new instances from static methods only.
    */
-  protected SlashCommand(@Nonnull String slashCommandPattern, boolean requiresBotMention,
+  protected SlashCommand(@Nonnull String slashCommandPattern, boolean requiresBotMention, boolean isAsync,
       @Nonnull Consumer<CommandContext> callback, String description) {
-
-    if (StringUtils.isEmpty(slashCommandPattern)) {
-      throw new IllegalArgumentException("The slash command name cannot be empty.");
-    }
-
     this.slashCommandName = slashCommandPattern;
     this.commandPattern = new SlashCommandPattern(this.slashCommandName);
     this.requiresBotMention = requiresBotMention;
+    this.isAsync = isAsync;
     if (this.requiresBotMention) {
       this.commandPattern.prependToken(new MatchingUserIdMentionToken(
           () -> getBotUserId())); // specific token with no argument name that matches user ID
@@ -118,6 +129,11 @@ public class SlashCommand extends CommandActivity<CommandContext> {
   @Override
   public void onActivity(CommandContext context) {
     this.callback.accept(context);
+  }
+
+  @Override
+  public boolean isAsynchronous() {
+    return this.isAsync;
   }
 
   @Override

@@ -1,16 +1,19 @@
 plugins {
     id 'java'
     id 'jacoco'
+    id "com.github.ben-manes.versions"
+    id 'project-report'
 }
 
 repositories {
     mavenCentral()
 }
 
-sourceCompatibility = '1.8'
+sourceCompatibility = JavaVersion.VERSION_17
 
 tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
+    options.compilerArgs << '-parameters'
 }
 
 javadoc {
@@ -26,7 +29,9 @@ java {
 jar {
     manifest {
         attributes("Implementation-Title": project.name,
-                "Implementation-Version": project.version)
+                "Implementation-Version": project.version,
+                "Automatic-Module-Name": project.name.replace("-", ".")
+        )
     }
 }
 
